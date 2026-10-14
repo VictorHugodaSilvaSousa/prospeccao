@@ -2,20 +2,26 @@
   "nome": "Barbearia Exemplo",
   "slug": "barbearia-exemplo",
   "aprovado": false,
-  "slogan": "Corte clássico, atendimento de bairro",
-  "descricao": "Barbearia familiar com mais de 10 anos de atendimento. Agende pelo WhatsApp e evite fila.",
+  "categoria": "Barbearia em Taguatinga",
+  "slogan": "Corte clássico, barba bem feita e atendimento de bairro.",
+  "descricao": "Barbearia familiar com mais de 10 anos de atendimento. Agende pelo WhatsApp e seja atendido sem fila.",
+  "destaques": ["Hora marcada, sem fila", "Pix e cartão", "Ar-condicionado", "Estacionamento fácil"],
   "cor": "#1f3a5f",
+  "tipo_schema": "BarberShop",
   "whatsapp": "61 99999-9999",
   "instagram": "barbeariaexemplo",
   "endereco": "QNA 1, Taguatinga - DF",
   "servicos": [
-    {"nome": "Corte", "preco": "R$ 35"},
-    {"nome": "Barba", "preco": "R$ 25"},
-    {"nome": "Corte + barba", "preco": "R$ 55"}
+    {"nome": "Corte", "desc": "Máquina e tesoura, com acabamento na navalha.", "preco": "R$ 35"},
+    {"nome": "Barba", "desc": "Toalha quente e hidratação.", "preco": "R$ 25"},
+    {"nome": "Corte + barba", "desc": "O combo mais pedido da casa.", "preco": "R$ 55"},
+    {"nome": "Sobrancelha", "preco": "R$ 10"}
   ],
   "horarios": {
     "Terça a sexta": "9h às 20h",
     "Sábado": "8h às 18h",
     "Domingo e segunda": "Fechado"
-  }
+  },
+  "chamada": "Garanta seu horário ainda hoje",
+  "credito": "Victor Hugo"
 }

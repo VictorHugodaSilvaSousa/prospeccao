@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from prospectar import buscar
+from prospectar import buscar, conferir_todos
 
 AQUI = Path(__file__).parent
 VISTOS = AQUI / "vistos.json"
@@ -25,15 +25,17 @@ def alvos():
             yield nicho.lower(), cidade
 
 
-def novos(linhas, vistos):
-    """Só quem não tem site, tem WhatsApp e ainda não foi mandado; marca como visto."""
-    saida = []
+def novos(linhas, vistos, cidade="", conferir=conferir_todos):
+    """Só quem não tem site, tem WhatsApp e ainda não foi visto; confere o site e marca como visto
+    (quem tem site também, para não gastar busca com ele de novo)."""
+    candidatos = []
     for l in linhas:
         chave = l["Nome"] + "|" + l["Endereço"]
         if l["Tem site"] == "NÃO" and l["WhatsApp"] and chave not in vistos:
             vistos.add(chave)
-            saida.append(l)
-    return saida
+            candidatos.append(l)
+    conferir(candidatos, cidade)
+    return [l for l in candidatos if l["Tem site"] == "NÃO"]
 
 
 def telegram(texto):
@@ -53,12 +55,14 @@ def main():
             falhas += 1
             print(f"::warning::{nicho} | {cidade} falhou: {ex}")
             continue
-        lista = novos(linhas, vistos)
+        lista = novos(linhas, vistos, cidade)
         total += len(lista)
         print(f"{nicho} | {cidade}: {len(lista)} novos")  # sem nomes: o log do Actions pode ser público
         for i in range(0, len(lista), 5):  # ~600 caracteres por item (link longo); limite do Telegram é 4096
             itens = "\n\n".join(
                 f"<b>{html.escape(l['Nome'])}</b>\n{html.escape(l['Endereço'])}\n"
+                + (f"⚠️ Confira antes: {html.escape(l['Site'])}\n" if l["Site"].startswith("talvez") else "")
+                + (f"{html.escape(l['Rede social'])}\n" if l["Rede social"] else "") +
                 f"<a href=\"{html.escape(l['WhatsApp'])}\">Abrir WhatsApp com a mensagem</a>"
                 for l in lista[i:i + 5])
             telegram(f"🧭 <b>{len(lista)} novos: {html.escape(nicho)} em {html.escape(cidade)}</b>\n\n{itens}")

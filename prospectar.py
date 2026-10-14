@@ -14,10 +14,13 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from openpyxl import Workbook
 from openpyxl.styles import Font
+
+from verificar import conferir
 
 MODELO = Path(__file__).with_name("mensagem.txt")
 UA ="prospeccao-local/1.0 (uso pessoal)"  # Nominatim exige User-Agent identificável
@@ -52,7 +55,7 @@ def get(url, data=None):
 
 
 OVERPASS = ("https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter",
-            "https://maps.mail.ru/osm/tools/overpass/api/interpreter")
+            "https://overpass.kumi.systems/api/interpreter")
 
 
 def overpass(data):
@@ -101,6 +104,7 @@ def linha(tags):
         "Rede social": pega(SOCIAL),
         "Telefone": pega(FONE),
         "Endereço": end,
+        "Conferido": "",
     }
 
 
@@ -116,6 +120,11 @@ def celular(fones):
 
 def mensagem(modelo, l, nicho):
     return modelo.format(nome=l["Nome"], nicho=nicho)
+
+
+def conferir_todos(linhas, cidade):
+    with ThreadPoolExecutor(6) as ex:  # cada conferência espera rede; em paralelo leva segundos, não minutos
+        list(ex.map(lambda l: conferir(l, cidade), linhas))
 
 
 def buscar(nicho, cidade):
@@ -142,11 +151,16 @@ def main():
         sys.exit(__doc__)
     nicho, cidade = sys.argv[1].lower(), sys.argv[2]
     nome, linhas = buscar(nicho, cidade)
+    alvo = [l for l in linhas if l["Tem site"] == "NÃO" and l["WhatsApp"]]
+    print(f"Conferindo se {len(alvo)} têm site de verdade...")
+    conferir_todos(alvo, cidade)
+    linhas.sort(key=lambda l: (l["Tem site"] == "sim", not l["WhatsApp"], not l["Telefone"], l["Nome"]))
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Prospecção"
-    cols = ["Nome", "Tem site", "WhatsApp", "Status", "Telefone", "Rede social", "Site", "Endereço", "Mensagem"]
+    cols = ["Nome", "Tem site", "WhatsApp", "Status", "Telefone", "Rede social", "Site", "Endereço", "Conferido",
+            "Mensagem"]
     ws.append(cols)
     for c in ws[1]:
         c.font = Font(bold=True)
@@ -155,7 +169,7 @@ def main():
         if l["WhatsApp"]:
             c = ws.cell(ws.max_row, 3, "Abrir conversa")
             c.hyperlink, c.style = l["WhatsApp"], "Hyperlink"
-    for col, w in zip("ABCDEFGHI", (40, 10, 16, 14, 20, 30, 35, 45, 80)):
+    for col, w in zip("ABCDEFGHIJ", (40, 10, 16, 14, 20, 30, 35, 45, 16, 80)):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
