@@ -1,0 +1,21 @@
+{
+  "nome": "Barbearia Exemplo",
+  "slug": "barbearia-exemplo",
+  "aprovado": false,
+  "slogan": "Corte clássico, atendimento de bairro",
+  "descricao": "Barbearia familiar com mais de 10 anos de atendimento. Agende pelo WhatsApp e evite fila.",
+  "cor": "#1f3a5f",
+  "whatsapp": "61 99999-9999",
+  "instagram": "barbeariaexemplo",
+  "endereco": "QNA 1, Taguatinga - DF",
+  "servicos": [
+    {"nome": "Corte", "preco": "R$ 35"},
+    {"nome": "Barba", "preco": "R$ 25"},
+    {"nome": "Corte + barba", "preco": "R$ 55"}
+  ],
+  "horarios": {
+    "Terça a sexta": "9h às 20h",
+    "Sábado": "8h às 18h",
+    "Domingo e segunda": "Fechado"
+  }
+}

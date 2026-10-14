@@ -1,0 +1,95 @@
+# Prospecção na nuvem: funciona com o PC DESLIGADO.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   TELEGRAM_TOKEN  token do robô que manda os contatos
+#   TELEGRAM_CHAT   seu chat privado
+#
+# - Segunda e quinta 8h (Brasília) busca os alvos de alvos.txt e manda no Telegram só os negócios NOVOS.
+# - A cada mudança em sites/clientes/ gera os sites e publica no GitHub Pages.
+# - Registros públicos não têm nomes de negócios; a lista de já enviados fica no cache do Actions.
+name: Prospecção
+
+on:
+  schedule:
+    - cron: "0 11 * * 1,4"   # 2x/semana: o cache some após 7 dias sem uso
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ["sites/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prospeccao-${{ github.event_name == 'push' && 'sites' || 'busca' }}
+  cancel-in-progress: false
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install -q openpyxl==3.1.5
+      - run: python test_prospectar.py && python test_nuvem_sites.py
+
+  busca:
+    needs: testes
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install -q openpyxl==3.1.5
+      - name: Restaurar lista de já enviados
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: vistos.json
+          key: vistos-${{ github.run_id }}
+          restore-keys: vistos-
+      - name: Buscar e mandar no Telegram
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+        run: python nuvem.py
+      - name: Salvar lista de já enviados
+        if: success()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: vistos.json
+          key: vistos-${{ github.run_id }}
+
+  sites:
+    needs: testes
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python sites/gerar.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: sites/publicado
+      - id: deploy
+        uses: actions/deploy-pages@v4

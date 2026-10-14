@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.xlsx
+prospeccao-*.html
+vistos.json
+sites/publicado/

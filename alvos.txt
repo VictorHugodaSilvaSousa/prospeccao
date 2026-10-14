@@ -1,0 +1,4 @@
+# Um alvo por linha: nicho | cidade. Nichos em prospectar.py (NICHOS) ou chave=valor do OpenStreetMap.
+barbearia | Brasília
+restaurante | Brasília
+academia | Brasília
