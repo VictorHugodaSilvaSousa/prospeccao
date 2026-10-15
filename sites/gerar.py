@@ -18,6 +18,9 @@ AQUI = Path(__file__).parent
 SAIDA = AQUI / "publicado"
 FOTO_OK = {".jpg", ".jpeg", ".png", ".webp"}
 BASE = os.environ.get("SITE_BASE", "").rstrip("/")  # ex.: https://usuario.github.io/prospeccao (o workflow define)
+if BASE:  # domínio em minúsculas (o dono do repo vem com maiúsculas); o caminho mantém a grafia
+    _u = urllib.parse.urlsplit(BASE)
+    BASE = _u._replace(netloc=_u.netloc.lower()).geturl()
 ZAP_SVG = ('<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 2a10 '
            '10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 '
            '8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 '
