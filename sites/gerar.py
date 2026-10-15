@@ -7,6 +7,7 @@ Enquanto "aprovado" for false, o site sai com faixa de PRÉVIA e noindex (não a
 """
 import html
 import json
+import os
 import re
 import shutil
 import sys
@@ -16,6 +17,7 @@ from pathlib import Path
 AQUI = Path(__file__).parent
 SAIDA = AQUI / "publicado"
 FOTO_OK = {".jpg", ".jpeg", ".png", ".webp"}
+BASE = os.environ.get("SITE_BASE", "").rstrip("/")  # ex.: https://usuario.github.io/prospeccao (o workflow define)
 ZAP_SVG = ('<svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M12 2a10 '
            '10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 '
            '8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 '
@@ -79,6 +81,11 @@ def pagina(c, fotos):
     insta = (f'<a href="https://instagram.com/{e(c["instagram"])}" rel="noopener noreferrer">Instagram @{e(c["instagram"])}</a>'
              if c.get("instagram") else "")
     credito = f"<p class='credito'>Site feito por {e(c['credito'])}</p>" if c.get("credito") else ""
+    faq = "".join(f"<details><summary>{e(f['pergunta'])}</summary><p>{e(f['resposta'])}</p></details>"
+                  for f in c.get("faq", []))
+    url = f"{BASE}/{c['slug']}/" if BASE else ""
+    meta_url = (f'<link rel="canonical" href="{e(url)}">\n<meta property="og:url" content="{e(url)}">'
+                + (f'\n<meta property="og:image" content="{e(url)}fotos/{e(fotos[0])}">' if fotos else "")) if url else ""
     ld = json.dumps({"@context": "https://schema.org", "@type": c.get("tipo_schema", "LocalBusiness"), "name": nome,
                      "description": c.get("descricao", ""), "telephone": "+" + digitos_celular(c["whatsapp"]),
                      "address": c["endereco"]}, ensure_ascii=False).replace("<", "\\u003c")
@@ -100,6 +107,7 @@ def pagina(c, fotos):
 <meta property="og:title" content="{e(nome)}">
 <meta property="og:description" content="{e(c.get('slogan') or c.get('descricao', ''))}">
 <meta name="theme-color" content="{e(c.get('cor', '#1f6feb'))}">
+{meta_url}
 <link rel="icon" href="data:image/svg+xml,{urllib.parse.quote(f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='{c.get('cor', '#1f6feb')}'/><text x='32' y='44' font-size='34' font-family='sans-serif' font-weight='700' text-anchor='middle' fill='{texto_sobre(c.get('cor', '#1f6feb'))}'>{e(nome[:1].upper())}</text></svg>")}">
 <link rel="stylesheet" href="estilo.css">
 <script type="application/ld+json">{ld}</script>
@@ -136,6 +144,7 @@ def pagina(c, fotos):
       <a class="botao secundario" href="{e(mapa)}" rel="noopener noreferrer">Abrir no mapa</a>
     </section>
   </div>
+  {secao('faq', 'Perguntas frequentes', f"<div class='faq'>{faq}</div>" if faq else '')}
   <section class="chamada">
     <h2>{e(c.get('chamada', 'Vamos agendar o seu horário?'))}</h2>
     <a class="botao" href="{e(zap)}" rel="noopener noreferrer">{ZAP_SVG}<span>Falar no WhatsApp</span></a>
@@ -211,9 +220,30 @@ border:1px solid var(--borda);border-radius:var(--raio);padding:20px 22px;box-sh
 .chamada{margin-top:72px;text-align:center;padding:48px 20px;border-radius:28px;background:var(--cartao);border:1px solid var(--borda);box-shadow:var(--sombra)}
 footer{text-align:center;color:var(--suave);padding:36px 16px 96px;font-size:.95rem}footer p{margin:4px 0}
 .credito{margin-top:18px!important;font-size:.82rem;opacity:.75}
+.faq{display:grid;gap:10px;max-width:820px}.faq details{background:var(--cartao);border:1px solid var(--borda);border-radius:14px;padding:4px 20px}
+.faq summary{cursor:pointer;font-weight:700;padding:14px 0;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.faq summary::-webkit-details-marker{display:none}.faq summary::after{content:"+";font-size:1.3rem;line-height:1;color:var(--cor)}
+.faq details[open] summary::after{content:"–"}.faq details p{margin:0 0 16px;color:var(--suave)}
+.faq summary:focus-visible{outline:3px solid var(--cor);outline-offset:3px;border-radius:6px}
 .flutuante{position:fixed;right:18px;bottom:18px;width:58px;height:58px;border-radius:50%%;background:var(--zap);color:#fff;
 display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:20}.flutuante svg{width:30px;height:30px}
 """
+
+
+def otimizar(origem, pasta):
+    """Foto de celular tem 3–8 MB; no site vira WebP de até 1600px (~200 KB), sem dados de GPS (EXIF).
+    Sem Pillow instalado, copia como está."""
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        shutil.copy(origem, pasta / origem.name)
+        return origem.name
+    nome = origem.stem + ".webp"
+    with Image.open(origem) as im:
+        im = ImageOps.exif_transpose(im).convert("RGB")  # gira certo e descarta o EXIF
+        im.thumbnail((1600, 1600))
+        im.save(pasta / nome, "WEBP", quality=80, method=6)
+    return nome
 
 
 def gerar(arq):
@@ -226,9 +256,8 @@ def gerar(arq):
     pasta_fotos = arq.with_suffix("")  # clientes/<arquivo>/ com as fotos, opcional
     if pasta_fotos.is_dir():
         for f in sorted(pasta_fotos.iterdir()):
-            if f.suffix.lower() in FOTO_OK and f.stat().st_size < 3_000_000 and re.fullmatch(r"[\w.-]+", f.name):
-                shutil.copy(f, destino / "fotos" / f.name)
-                fotos.append(f.name)
+            if f.suffix.lower() in FOTO_OK and f.stat().st_size < 15_000_000 and re.fullmatch(r"[\w.-]+", f.name):
+                fotos.append(otimizar(f, destino / "fotos"))
     cor = c.get("cor", "#1f6feb")
     (destino / "index.html").write_text(pagina(c, fotos), encoding="utf-8")
     (destino / "estilo.css").write_text(
@@ -237,13 +266,27 @@ def gerar(arq):
 
 
 def main():
-    erros = 0
+    erros, aprovados = 0, []
     for arq in sorted((AQUI / "clientes").glob("*.json")):
         try:
             print(f"OK  {arq.name} -> {gerar(arq).relative_to(AQUI)}")
+            c = json.loads(arq.read_text(encoding="utf-8"))
+            if c.get("aprovado"):
+                aprovados.append(c["slug"])
         except (ValueError, KeyError, json.JSONDecodeError) as ex:
             erros += 1
             print(f"ERRO {arq.name}: {ex}")
+    # Raiz sem lista de clientes (prévias não ficam expostas); sitemap só com os aprovados.
+    (SAIDA / "index.html").write_text('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex">'
+                                      '<title>Sites</title><p>Nada aqui.</p>', encoding="utf-8")
+    robots = "User-agent: *\nAllow: /\n"
+    if BASE:
+        urls = "".join(f"<url><loc>{html.escape(BASE)}/{s}/</loc></url>" for s in aprovados)
+        (SAIDA / "sitemap.xml").write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns='
+                                           f'"http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>\n',
+                                           encoding="utf-8")
+        robots += f"Sitemap: {BASE}/sitemap.xml\n"
+    (SAIDA / "robots.txt").write_text(robots, encoding="utf-8")
     sys.exit(1 if erros else 0)
 
 

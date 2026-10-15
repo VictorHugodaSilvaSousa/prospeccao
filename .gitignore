@@ -4,3 +4,4 @@ __pycache__/
 prospeccao-*.html
 vistos.json
 sites/publicado/
+.env

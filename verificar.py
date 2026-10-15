@@ -8,9 +8,11 @@ import json
 import os
 import re
 import socket
+import ssl
 import threading
 import time
 import unicodedata
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -26,6 +28,8 @@ DIRETORIOS = ("instagram.", "facebook.", "ifood.", "google.", "tripadvisor.", "g
               "whatsapp.", "trinks.", "agendaedu.", "gympass.", "totalpass.", "rappi.", "aiqfome.", "99app.",
               "mercadolivre.", "olx.", "reclameaqui.", "foursquare.", "listamais.", "encontra")
 UA = "Mozilla/5.0 (compatible; prospeccao-local/1.0)"
+UA_CELULAR = ("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) "
+              "Chrome/126.0 Mobile Safari/537.36")  # saúde do site: ver a página que o cliente vê no celular
 _brave = threading.Lock()
 
 
@@ -120,8 +124,49 @@ def brave(nome, cidade):
     return sites, insta
 
 
+def saude(url):
+    """Problema visível do site ('' se está ok ou se não dá pra ter certeza). Frase cabe em 'vi que ...'."""
+    # Acusar site quebrado sem ter certeza queima o nome de quem manda a mensagem:
+    # só conta o que é definitivo (domínio inexistente, 404 repetido, certificado inválido).
+    url = url if "://" in url else "http://" + url
+    erros = []
+    for tentativa in (0, 1):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA_CELULAR, "Accept": "text/html"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                final, pagina = r.geturl(), r.read(400_000).decode("utf-8", "ignore").lower()
+            break
+        except urllib.error.HTTPError as ex:
+            if ex.code not in (404, 410):
+                return ""  # 403/429/5xx costuma ser bloqueio de robô ou instabilidade, não site quebrado
+            erros.append("404")
+        except urllib.error.URLError as ex:
+            if isinstance(ex.reason, socket.gaierror):
+                erros.append("dns")
+            elif isinstance(ex.reason, ssl.SSLCertVerificationError):
+                return "o certificado de segurança do site está vencido ou inválido (o navegador mostra alerta)"
+            else:
+                return ""  # timeout/conexão: pode ser só lentidão
+        except Exception:
+            return ""
+        time.sleep(3)
+    else:
+        if erros == ["dns", "dns"]:
+            return "o endereço do site não existe mais (o site saiu do ar)"
+        return "o site está fora do ar (página não encontrada)"
+    if not final.startswith("https://"):
+        return "o site não abre com segurança (sem o cadeado HTTPS)"
+    if not re.search(r"""name=["']?viewport""", pagina):
+        return "o site não se adapta bem ao celular"
+    return ""
+
+
 def conferir(l, cidade):
-    """Preenche no dict do negócio: Tem site ('sim' só com prova), Site, Conferido e Rede social."""
+    """Preenche no dict do negócio: Tem site ('sim' só com prova), Site, Problema, Conferido e Rede social."""
+    if l["Tem site"] == "sim":
+        l["Problema"] = saude(l["Site"])
+        l["Conferido"] = l["Conferido"] or "saúde do site"
+        return l
     talvez = ""
     candidatos, insta = dominio_provavel(l["Nome"]), ""
     for etapa in (0, 1):
@@ -131,6 +176,7 @@ def conferir(l, cidade):
             r = classificar(url, l)
             if r == "sim":
                 l["Site"], l["Tem site"] = url, "sim"
+                l["Problema"] = saude(url)
                 break
             talvez = talvez or (url if r == "talvez" else "")
         if l["Tem site"] == "sim":
@@ -139,5 +185,6 @@ def conferir(l, cidade):
         l["Site"] = f"talvez: {talvez}"
     if insta and not l["Rede social"]:
         l["Rede social"] = insta
-    l["Conferido"] = "domínio + busca" if os.environ.get("BRAVE_API_KEY") else "só domínio"
+    feito = "domínio + busca" if os.environ.get("BRAVE_API_KEY") else "só domínio"
+    l["Conferido"] = f"{l['Conferido']} + {feito}" if l.get("Conferido") else feito
     return l

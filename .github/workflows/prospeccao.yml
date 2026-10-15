@@ -3,16 +3,18 @@
 # Secrets (Settings > Secrets and variables > Actions):
 #   TELEGRAM_TOKEN  token do robô que manda os contatos
 #   TELEGRAM_CHAT   seu chat privado
-#   BRAVE_API_KEY   opcional; sem ela, a conferência de site só testa o domínio provável
+#   BRAVE_API_KEY      opcional; sem ela, a conferência de site só testa o domínio provável
+#   GOOGLE_PLACES_KEY  opcional; soma o Google Maps (API oficial) ao OpenStreetMap
 #
-# - Segunda e quinta 8h (Brasília) busca os alvos de alvos.txt e manda no Telegram só os negócios NOVOS.
+# - Dias úteis 8h (Brasília) busca os alvos de alvos.txt e manda no Telegram até PROSPECCAO_LIMITE
+#   contatos NOVOS (padrão 15/dia; Variable opcional). O resto fica para o dia seguinte.
 # - A cada mudança em sites/clientes/ gera os sites e publica no GitHub Pages.
 # - Registros públicos não têm nomes de negócios; a lista de já enviados fica no cache do Actions.
 name: Prospecção
 
 on:
   schedule:
-    - cron: "0 11 * * 1,4"   # 2x/semana: o cache some após 7 dias sem uso
+    - cron: "0 11 * * 1-5"   # dias úteis 8h (Brasília); o cache some após 7 dias sem uso
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -36,7 +38,7 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
-      - run: pip install -q openpyxl==3.1.5
+      - run: pip install -q openpyxl==3.1.5 pillow==11.3.0
       - run: python test_prospectar.py && python test_nuvem_sites.py
 
   busca:
@@ -63,6 +65,8 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
           BRAVE_API_KEY: ${{ secrets.BRAVE_API_KEY }}   # opcional: confere site pela busca
+          GOOGLE_PLACES_KEY: ${{ secrets.GOOGLE_PLACES_KEY }}   # opcional: Google Maps oficial
+          PROSPECCAO_LIMITE: ${{ vars.PROSPECCAO_LIMITE }}
         run: python nuvem.py
       - name: Salvar lista de já enviados
         if: success()
@@ -89,7 +93,10 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.12"
+      - run: pip install -q pillow==11.3.0   # otimiza as fotos (WebP, sem GPS)
       - run: python sites/gerar.py
+        env:
+          SITE_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: sites/publicado

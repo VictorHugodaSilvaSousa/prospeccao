@@ -22,6 +22,11 @@
     "Sábado": "8h às 18h",
     "Domingo e segunda": "Fechado"
   },
+  "faq": [
+    {"pergunta": "Precisa agendar?", "resposta": "Recomendamos agendar pelo WhatsApp para ser atendido sem espera."},
+    {"pergunta": "Quais as formas de pagamento?", "resposta": "Pix, cartão de crédito e débito."},
+    {"pergunta": "Atendem crianças?", "resposta": "Sim, a partir de 3 anos, com acompanhante."}
+  ],
   "chamada": "Garanta seu horário ainda hoje",
   "credito": "Victor Hugo"
 }

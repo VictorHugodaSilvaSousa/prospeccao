@@ -60,16 +60,21 @@ def main():
     api(f"{base}/sendMessage", urllib.parse.urlencode(
         {"chat_id": chat, "text": "✅ Prospecção ligada. Os contatos novos chegam aqui segunda e quinta às 8h."}).encode())
 
+    gravar_secrets({"TELEGRAM_TOKEN": tg, "TELEGRAM_CHAT": chat})
+    print("Secrets TELEGRAM_TOKEN e TELEGRAM_CHAT gravados no GitHub. Pronto!")
+
+
+def gravar_secrets(pares):
+    """Grava Secrets do repositório, criptografados com a chave pública dele (o valor nunca vai aberto)."""
     gh = subprocess.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n\n",
                         capture_output=True, text=True).stdout
     gh = next(l[9:] for l in gh.splitlines() if l.startswith("password="))
     url = f"https://api.github.com/repos/{REPO}/actions/secrets"
     chave = api(f"{url}/public-key", token=gh)
     caixa = public.SealedBox(public.PublicKey(chave["key"].encode(), encoding.Base64Encoder()))
-    for nome, valor in (("TELEGRAM_TOKEN", tg), ("TELEGRAM_CHAT", chat)):
+    for nome, valor in pares.items():
         cifrado = base64.b64encode(caixa.encrypt(valor.encode())).decode()
         api(f"{url}/{nome}", {"encrypted_value": cifrado, "key_id": chave["key_id"]}, gh, "PUT")
-    print("Secrets TELEGRAM_TOKEN e TELEGRAM_CHAT gravados no GitHub. Pronto!")
 
 
 if __name__ == "__main__":

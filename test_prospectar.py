@@ -12,6 +12,8 @@ def test_linha():
     l = linha({"name": "Barbearia X", "contact:phone": "61 9999", "addr:street": "QNA 1", "addr:housenumber": "10"})
     assert l["Tem site"] == "NÃO" and l["Telefone"] == "61 9999" and l["Endereço"] == "QNA 1 10"
     assert linha({"name": "Y", "website": "https://y.com"})["Tem site"] == "sim"
+    l = linha({"name": "Z", "website": "https://www.instagram.com/z/"})
+    assert l["Tem site"] == "NÃO" and l["Rede social"] == "https://www.instagram.com/z/"
 
 
 def test_filtro():
